@@ -1,0 +1,24 @@
+.mainLayout {
+  display: flex;
+  height: 100vh;
+}
+
+.svgPanel {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.chatPanel {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+.splitter {
+  width: 8px;
+  background-color: #ccc;
+  cursor: col-resize;
+}
+
+.splitter:hover {
+  background-color: #999;
+}

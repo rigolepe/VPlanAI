@@ -1,0 +1,29 @@
+.dataSourceList {
+  margin-bottom: 1rem;
+}
+
+.dataSourceItem {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.dataSourceItem span {
+  margin-right: 1rem;
+}
+
+.dataSourceItem label {
+  margin-right: 1rem;
+}
+
+.dataSourceList button {
+  padding: 0.5rem 1rem;
+  background-color: #17a2b8;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.dataSourceList button:hover {
+  background-color: #138496;
+}

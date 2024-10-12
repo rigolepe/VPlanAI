@@ -1,0 +1,28 @@
+.chatPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.inputArea {
+  display: flex;
+  margin-top: 1rem;
+}
+
+.inputArea input {
+  flex-grow: 1;
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.inputArea button {
+  padding: 0.5rem 1rem;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.inputArea button:hover {
+  background-color: #218838;
+}
