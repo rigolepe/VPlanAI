@@ -554,9 +554,9 @@ export const renderSvgLayer = (layerId: string, visible: boolean) => {
 
 ```
 .chatHistory {
-  height: 300px;
+  height: 700px;
   overflow-y: auto;
-  border: 1px solid #ccc;
+ 
   padding: 1rem;
   margin-bottom: 1rem;
 }
@@ -591,7 +591,7 @@ export const renderSvgLayer = (layerId: string, visible: boolean) => {
 }
 
 .sidebar {
-  width: 200px;
+  width: 70px;
   background-color: #f0f0f0;
   padding: 1rem;
   overflow-y: auto;
@@ -675,14 +675,16 @@ interface AgentSelectorProps {
 }
 
 const AgentSelector: React.FC<AgentSelectorProps> = ({ agents, onSelectAgent, toggleAgentManager }) => {
-  const handleAgentSelect = (agent: Agent | null) => {
-    onSelectAgent(agent);
+  const handleAgentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedAgent = agents.find(a => a.id === e.target.value) || null;
+    onSelectAgent(selectedAgent);
   };
 
   return (
     <div className={styles.agentSelector}>
       <h3>Select an Agent</h3>
-      <select onChange={(e) => handleAgentSelect(agents.find(a => a.id === e.target.value) || null)}>
+      <select onChange={handleAgentSelect}>
+        <option value="">Select Agent</option>
         {agents.map(agent => (
           <option key={agent.id} value={agent.id}>{agent.name}</option>
         ))}
@@ -693,6 +695,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({ agents, onSelectAgent, to
 };
 
 export default AgentSelector;
+
 ```
 
 ## vplan-chat/src/components/AgentSelector.module.css
@@ -844,12 +847,14 @@ export default DataSourceList;
 ## vplan-chat/src/components/ChatPanel.tsx
 
 ```
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ChatHistory from './ChatHistory';
 import AgentSelector from './AgentSelector';
 import DataSourceList from './DataSourceList';
 import styles from './ChatPanel.module.css';
 import { Agent } from '../types/agent';
+import { ChatMessage } from '../types/chat';
+import { sendMessageWithFunction } from '../services/api';
 
 interface ChatPanelProps {
   showAgentManager: boolean;
@@ -858,32 +863,94 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents }) => {
-  
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
-  const [chatHistory, setChatHistory] = useState([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [userMessage, setUserMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSendMessage = (message: string) => {
-    // Implement sending message logic here
+  const handleSendMessage = async () => {
+    if (currentAgent && userMessage.trim()) {
+      const newMessage: ChatMessage = {
+        sender: 'user',
+        content: userMessage,
+        timestamp: new Date(),
+      };
+      setChatHistory(prev => [...prev, newMessage]);
+      setUserMessage('');
+      setLoading(true);
+
+      try {
+        const response = await sendMessageWithFunction(currentAgent, userMessage, '');
+        const { assistantMessage, functionCall } = response;
+
+        setChatHistory(prev => [...prev, assistantMessage]);
+
+        // Handle the function call from OpenAI, if present
+        if (functionCall) {
+          handleFunctionCall(functionCall);
+        }
+
+      } catch (error) {
+        console.error('Error sending message:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
+
+  const handleFunctionCall = async (functionCall: any) => {
+    if (functionCall.name === 'getWeather') {
+      const functionArgs = JSON.parse(functionCall.arguments);
+      const weatherData = await getWeather(functionArgs.location); // Example function
+
+      // Send the result of the function back to the chat
+      const functionResult: ChatMessage = {
+        sender: 'agent',
+        content: `The weather in ${functionArgs.location} is ${weatherData.temperature}°C with ${weatherData.description}.`,
+        timestamp: new Date(),
+      };
+      setChatHistory(prev => [...prev, functionResult]);
+    }
+  };
+
+  const getWeather = async (location: string) => {
+    // This is a mock function to simulate getting weather data
+    return {
+      location,
+      temperature: 25,
+      description: 'sunny',
+    };
+  };
+
+  useEffect(() => {
+    if (currentAgent) {
+      setChatHistory([]); // Clear chat when switching agents
+    }
+  }, [currentAgent]);
 
   return (
     <div className={styles.chatPanel}>
       <AgentSelector agents={agents} onSelectAgent={(agent) => setCurrentAgent(agent)} toggleAgentManager={toggleAgentManager} />
       <ChatHistory history={chatHistory} />
-      <DataSourceList />
       <div className={styles.inputArea}>
         <input
           type="text"
           placeholder="Type your message..."
-          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e.currentTarget.value)}
+          value={userMessage}
+          onChange={(e) => setUserMessage(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
         />
-        <button onClick={() => handleSendMessage('Send')}>Send</button>
+        <button onClick={handleSendMessage} disabled={loading}>
+          {loading ? 'Sending...' : 'Send'}
+        </button>
       </div>
+      <DataSourceList />
     </div>
   );
 };
 
 export default ChatPanel;
+
 ```
 
 ## vplan-chat/src/components/SvgPanel.tsx
@@ -1078,6 +1145,7 @@ export default AgentManager;
 
 ```
 .dataSourceList {
+  height: 200px;
   margin-bottom: 1rem;
 }
 
@@ -1145,26 +1213,51 @@ import axios from 'axios';
 import { Agent } from '../types/agent';
 import { ChatMessage } from '../types/chat';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
-
-export const sendMessage = async (agent: Agent, message: string, context: string): Promise<ChatMessage> => {
-  try {
-    const response = await axios.post(`${agent.apiUrl}/chat`, {
-      message,
-      context,
-      systemPrompt: agent.systemPrompt,
+export const sendMessageWithFunction = async (agent: Agent, message: string, context: string): Promise<{ assistantMessage: ChatMessage; functionCall?: any }> => {
+  try { 
+    const response = await axios.post(`${agent.apiUrl}`, {
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: 'system', content: agent.systemPrompt },
+        { role: 'user', content: message }
+      ],
+      functions: [
+        {
+          name: "getWeather",
+          description: "Get the weather forecast for a specific location",
+          parameters: {
+            type: "object",
+            properties: {
+              location: {
+                type: "string",
+                description: "The city and state, e.g., 'San Francisco, CA'"
+              }
+            },
+            required: ["location"]
+          }
+        }
+      ],
+      function_call: "auto", // This will automatically call the function if needed
     }, {
       headers: {
         'Authorization': `Bearer ${agent.apiKey}`,
       },
     });
-    return response.data;
+
+    const assistantMessage: ChatMessage = {
+      sender: 'agent',
+      content: response.data.choices[0].message.content || '',
+      timestamp: new Date(),
+    };
+
+    const functionCall = response.data.choices[0].message.function_call;
+
+    return { assistantMessage, functionCall };
   } catch (error) {
     console.error('Error sending message:', error);
     throw error;
   }
 };
 
-// Add more API functions as needed for managing agents, data sources, etc.
 ```
 

@@ -12,6 +12,7 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentManager, agents }) => {
   const [splitPosition, setSplitPosition] = useState(50);
+  const [jsonData, setJsonData] = useState([])
 
   const handleSplitDrag = (e: React.MouseEvent) => {
     // Implement split dragging logic here
@@ -20,7 +21,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
   return (
     <div className={styles.mainLayout}>
       <div className={styles.svgPanel} style={{ width: `${splitPosition}%` }}>
-        <SvgPanel />
+        <SvgPanel jsonData={jsonData} />
       </div>
       <div className={styles.splitter} onMouseDown={handleSplitDrag}></div>
       <div className={styles.chatPanel} style={{ width: `${100 - splitPosition}%` }}>
