@@ -9,14 +9,16 @@ interface AgentSelectorProps {
 }
 
 const AgentSelector: React.FC<AgentSelectorProps> = ({ agents, onSelectAgent, toggleAgentManager }) => {
-  const handleAgentSelect = (agent: Agent | null) => {
-    onSelectAgent(agent);
+  const handleAgentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedAgent = agents.find(a => a.id === e.target.value) || null;
+    onSelectAgent(selectedAgent);
   };
 
   return (
     <div className={styles.agentSelector}>
       <h3>Select an Agent</h3>
-      <select onChange={(e) => handleAgentSelect(agents.find(a => a.id === e.target.value) || null)}>
+      <select onChange={handleAgentSelect}>
+        <option value="">Select Agent</option>
         {agents.map(agent => (
           <option key={agent.id} value={agent.id}>{agent.name}</option>
         ))}
