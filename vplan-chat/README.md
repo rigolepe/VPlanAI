@@ -53,10 +53,22 @@ VPlan Chat is a TypeScript + React web application that combines SVG visualizati
 - `server/`: Contains the backend source code
 - `public/`: Static assets
 
+## Next steps
+
+1 Implement the sliding edge between SVG and Chat panels.
+2 Add zoom and pan functionality to the SVG viewer.
+3 Implement the agent management interface (adding, editing agents).
+4 Create the JSON data source loading and management system.
+5 Implement the actual LLM API calls and function calling framework.
+6 Add more detailed styling and responsiveness.
+7 Implement proper error handling and loading states.
+8 Set up proper state management for chat histories.
+9 Implement the SVG rendering logic based on the selected data source.
+
 ## Contributing
 
 Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
 
 ## License
 
-This project is licensed under the MIT License.
+This project has a proprietary license.

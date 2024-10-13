@@ -5,7 +5,13 @@ import DataSourceList from './DataSourceList';
 import styles from './ChatPanel.module.css';
 import { Agent } from '../types/agent';
 
-const ChatPanel: React.FC = () => {
+interface ChatPanelProps {
+  showAgentManager: boolean;
+  toggleAgentManager: () => void;
+  agents: Agent[];
+}
+
+const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents }) => {
   
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [chatHistory, setChatHistory] = useState([]);
@@ -16,7 +22,7 @@ const ChatPanel: React.FC = () => {
 
   return (
     <div className={styles.chatPanel}>
-      <AgentSelector onSelectAgent={(agent) => setCurrentAgent(agent)} />
+      <AgentSelector agents={agents} onSelectAgent={(agent) => setCurrentAgent(agent)} toggleAgentManager={toggleAgentManager} />
       <ChatHistory history={chatHistory} />
       <DataSourceList />
       <div className={styles.inputArea}>

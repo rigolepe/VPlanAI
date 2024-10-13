@@ -1,24 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Agent } from '../types/agent';
 import styles from './AgentSelector.module.css';
 
 interface AgentSelectorProps {
-  onSelectAgent: (agent: Agent  | null) => void;
+  agents: Agent[];
+  onSelectAgent: (agent: Agent | null) => void;
+  toggleAgentManager: () => void;
 }
 
-const AgentSelector: React.FC<AgentSelectorProps> = ({ onSelectAgent }) => {
-  const [agents, setAgents] = useState<Agent[]>([]);
-
-  useEffect(() => {
-    // Load agents from storage or API
-    // This is a placeholder for the actual implementation
-    const loadedAgents: Agent[] = [
-      { id: '1', name: 'Default Agent', apiUrl: 'https://api.example.com', systemPrompt: 'You are a helpful assistant.' },
-      // Add more agents as needed
-    ];
-    setAgents(loadedAgents);
-  }, []);
-
+const AgentSelector: React.FC<AgentSelectorProps> = ({ agents, onSelectAgent, toggleAgentManager }) => {
   const handleAgentSelect = (agent: Agent | null) => {
     onSelectAgent(agent);
   };
@@ -31,7 +21,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({ onSelectAgent }) => {
           <option key={agent.id} value={agent.id}>{agent.name}</option>
         ))}
       </select>
-      <button onClick={() => {/* Open modal to add/edit agent */}}>Manage Agents</button>
+      <button onClick={toggleAgentManager}>Manage Agents</button>
     </div>
   );
 };

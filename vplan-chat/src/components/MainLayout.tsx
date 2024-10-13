@@ -2,8 +2,15 @@ import React, { useState } from 'react';
 import SvgPanel from './SvgPanel';
 import ChatPanel from './ChatPanel';
 import styles from './MainLayout.module.css';
+import { Agent } from '../types/agent';
 
-const MainLayout: React.FC = () => {
+interface MainLayoutProps {
+  showAgentManager: boolean;
+  toggleAgentManager: () => void;
+  agents: Agent[];
+}
+
+const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentManager, agents }) => {
   const [splitPosition, setSplitPosition] = useState(50);
 
   const handleSplitDrag = (e: React.MouseEvent) => {
@@ -17,7 +24,7 @@ const MainLayout: React.FC = () => {
       </div>
       <div className={styles.splitter} onMouseDown={handleSplitDrag}></div>
       <div className={styles.chatPanel} style={{ width: `${100 - splitPosition}%` }}>
-        <ChatPanel />
+        <ChatPanel showAgentManager={showAgentManager} toggleAgentManager={toggleAgentManager} agents={agents} />
       </div>
     </div>
   );
