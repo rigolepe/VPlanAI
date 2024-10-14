@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import styles from './SvgPanel.module.css';
+import { useRef } from 'react';
 
 
 // Define the interface for the entities based on the JSON schema
@@ -102,6 +103,13 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   const [bounds, setBounds] = useState<number[]>([0, 0, 100, 100])
   const [width, setWidth] = useState<number>(100)
   const [height, setHeight] = useState<number>(100)
+  const [viewBox, setViewBox] = useState<string>('0 0 -100 100'); // Manage the viewBox state
+  const [zoom, setZoom] = useState<number>(1); // Track zoom level
+  const [translation, setTranslation] = useState<number[]>([0, 0]); // Track pan translation
+  const [isDragging, setIsDragging] = useState<boolean>(false); // Track drag state
+  const lastMousePosition = useRef<{ x: number, y: number } | null>(null); // For drag events
+
+  const defaultStrokeWidth = 0.1
 
   // Load the JSON data and group by layers
   useEffect(() => {
@@ -131,6 +139,49 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     console.log(`bounds: ${bounds}`)
     console.log(`width: ${width}, height: ${height}`)
   }, [jsonData, inVisibleLayers]);
+
+  // Zoom event handler (mouse scroll)
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = 1.1;
+    const newZoom = e.deltaY < 0 ? zoom * zoomFactor : zoom / zoomFactor;
+    setZoom(newZoom);
+  };
+
+  // Mouse down to start dragging
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    lastMousePosition.current = { x: e.clientX, y: e.clientY };
+  };
+
+  // Mouse move for dragging
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !lastMousePosition.current) return;
+
+    const dx = e.clientX - lastMousePosition.current.x;
+    const dy = e.clientY - lastMousePosition.current.y;
+
+    // Calculate the new translation
+    const newTranslation = [
+      translation[0] - dx / zoom, // Adjust translation based on zoom level
+      translation[1] - dy / zoom,
+    ];
+
+    setTranslation(newTranslation);
+    lastMousePosition.current = { x: e.clientX, y: e.clientY };
+  };
+
+  // Mouse up to stop dragging
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    lastMousePosition.current = null;
+  };
+
+  // Update the viewBox when zoom or translation changes
+  useEffect(() => {
+    setViewBox(`${bounds[0] + translation[0]} ${-bounds[1] + translation[1]} ${width / zoom} ${height / zoom}`);
+  }, [zoom, translation, bounds, width, height]);
+
 
   // Helper function to transform points (scaling, rotation, and translation)
   const transformPoint = (
@@ -176,22 +227,24 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             x2={end[0]}
             y2={end[1]}
             stroke="black"
-            strokeWidth="1"
+            strokeWidth={defaultStrokeWidth}
           />
         )
         break
       }
       case 'POLYLINE': {
-        const points = (entity.coordinates as Coordinates2D[])
-          .map((coord) => coord.join(','))
-          .join(' ');
+        var coords = entity.coordinates as Coordinates2D[]
+        if (entity.is_closed) {
+          coords = [...entity.coordinates, entity.coordinates[0]] as Coordinates2D[]
+        }
+        const points = coords.map((coord) => coord.join(',')).join(' ');
         rendering = (
           <polyline
             key={key}
             points={points}
             fill="none"
             stroke="black"
-            strokeWidth="1"
+            strokeWidth={defaultStrokeWidth}
             style={{ fill: entity.is_closed ? 'none' : undefined }}
           />
         )
@@ -207,7 +260,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             r={entity.radius}
             stroke="black"
             fill="none"
-            strokeWidth="1"
+            strokeWidth={defaultStrokeWidth}
           />
         )
         break
@@ -228,6 +281,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             d={`M ${startX},${startY} A ${radius},${radius} 0 ${large_arc_flag},1 ${endX},${endY}`}
             stroke="black"
             fill="none"
+            strokeWidth={defaultStrokeWidth}
           />
         )
         break
@@ -262,9 +316,14 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     }
 
     return (
-      <g key={key}transform={`rotate(${transform.rotation}, 0, 0) translate(${transform.translation[0]}, ${transform.translation[1]}) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
-        {blockEntities.map((entity, index) =>
-          renderEntity(entity, index)
+      <g key={key} transform={`rotate(${transform.rotation}, 0, 0) translate(${transform.translation[0]}, ${transform.translation[1]}) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
+        {blockEntities.map((entity, index) => {
+          if (entity.type === 'INSERT') {
+            return renderInsert(entity as Insert, index)
+          } else {
+            return renderEntity(entity, index)
+          }
+        }
         )}
       </g>
     );
@@ -288,10 +347,16 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
           </button>
         ))}
       </div>
-      <div className={styles.svgContainer}>
-        <svg width="100%" height="100%" viewBox={`${bounds[0]} ${-bounds[1]} ${width} ${height}`}>
+      <div className={styles.svgContainer}
+        onWheel={handleWheel} // Zoom event
+        onMouseDown={handleMouseDown} // Start drag
+        onMouseMove={handleMouseMove} // Drag move
+        onMouseUp={handleMouseUp} // End drag
+        onMouseLeave={handleMouseUp} // Handle drag stop on mouse leave
+      >
+        <svg width="100%" height="100%" viewBox={viewBox}>
           <g transform={`translate(0, ${height}) scale(1, -1)`}>
-            {Object.keys(layers).filter((layerName, layerIndex)=> !inVisibleLayers.includes(layerName)).map((layerName, layerIndex) => (
+            {Object.keys(layers).filter((layerName, layerIndex) => !inVisibleLayers.includes(layerName)).map((layerName, layerIndex) => (
               <g key={layerIndex} id={layerName}>
                 {layers[layerName].map((entity, entityIndex) => {
                   if (entity.type === 'INSERT') {
