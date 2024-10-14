@@ -142,6 +142,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     setHeight(height)
     console.log(`bounds: ${bounds}`)
     console.log(`width: ${width}, height: ${height}`)
+    setViewBox(`${bounds[0] + translationRef.current[0]} ${-bounds[1] + translationRef.current[1]} ${width / zoom} ${height / zoom}`);
   }, [jsonData, inVisibleLayers]);
 
   // Zoom event handler (mouse scroll)
