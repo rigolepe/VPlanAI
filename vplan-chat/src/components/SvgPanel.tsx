@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from './SvgPanel.module.css';
 import { useRef } from 'react';
+import { v4 as uuid } from 'uuid';
 
 
 // Define the interface for the entities based on the JSON schema
@@ -24,18 +25,26 @@ interface Entity {
   rotation?: number;
   xscale?: number;
   yscale?: number;
+  tag?: string;
   [key: string]: any; // Extendable for other properties
 }
 
 interface Insert extends Entity {
   name: string; // Block name
-  attribs?: any[]; // Inserted attributes (ignored for now)
+  attribs?: Attrib[]; // Inserted attributes (ignored for now)
 }
 
 interface Block {
   id: string;
   block_name: string;
   entities: Entity[];
+}
+
+interface Attrib {
+  text?: string;
+  coordinates: Coordinates2D;
+  rotation?: number;
+  tag: string;
 }
 
 interface SvgPanelProps {
@@ -237,17 +246,17 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   }
 
   // Drawing functions for each type of entity
-  const renderEntity = (entity: Entity, key: number) => {
+  const renderEntity = (entity: Entity) => {
     switch (entity.type) {
       case 'POINT': {
         const [x, y] = entity.coordinates as Coordinates2D;
-        return <circle key={key} cx={x} cy={y} r={2} fill="black" />
+        return <circle key={uuid()} cx={x} cy={y} r={2} fill="black" />
       }
       case 'LINE': {
         const [start, end] = entity.coordinates as Coordinates2D[];
         return (
           <line
-            key={key}
+            key={uuid()}
             x1={start[0]}
             y1={start[1]}
             x2={end[0]}
@@ -266,12 +275,11 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         const points = coords.map((coord) => coord.join(',')).join(' ');
         return (
           <polyline
-            key={key}
+            key={uuid()}
             points={points}
             fill="none"
             stroke="black"
             strokeWidth={defaultStrokeWidth}
-            style={{ fill: entity.is_closed ? 'none' : undefined }}
           />
         )
       }
@@ -282,12 +290,11 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         const points = coords.map((coord) => coord.join(',')).join(' ')
         return (
           <polyline
-            key={key}
+            key={uuid()}
             points={points}
             fill="gray"
             stroke="black"
             strokeWidth={defaultStrokeWidth}
-            style={{ fill: entity.is_closed ? 'none' : undefined }}
           />
         )
       }
@@ -295,7 +302,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         const [x, y] = entity.coordinates as Coordinates2D;
         return (
           <circle
-            key={key}
+            key={uuid()}
             cx={x}
             cy={y}
             r={entity.radius}
@@ -317,7 +324,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
 
         return (
           <path
-            key={key}
+            key={uuid()}
             d={`M ${startX},${startY} A ${radius},${radius} 0 ${large_arc_flag},1 ${endX},${endY}`}
             stroke="black"
             fill="none"
@@ -329,7 +336,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         const [x, y] = entity.coordinates as Coordinates2D;
         const rotation = entity.rotation ?? 0
         return (
-          <text key={key} x={x} y={y} fontSize={entity.height} fill="black" transform={`rotate(${rotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
+          <text key={uuid()} x={x} y={y} fontSize={entity.height} fill="black" transform={`rotate(${rotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
             {entity.text}
           </text>
         )
@@ -340,11 +347,9 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   };
 
   // Render a block entity, using the coordinates of the insert
-  const renderInsert = (insert: Insert, key: number) => {
+  const renderInsert = (insert: Insert) => {
     const blockEntities = blocks[insert.name];
     if (!blockEntities) return null;
-    // todo de ATTRIB ook nog toevoegen in het block insert
-
 
     const transform: Transformation = {
       scale: [insert.xscale ?? 1, insert.yscale ?? 1],
@@ -353,15 +358,26 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     }
 
     return (
-      <g key={key} transform={`rotate(${transform.rotation}, 0, 0) translate(${transform.translation[0]}, ${transform.translation[1]}) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
-        {blockEntities.map((entity, index) => {
+      <g key={uuid()} transform={` translate(${transform.translation[0]}, ${transform.translation[1]}) rotate(${transform.rotation}, 0, 0) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
+        {blockEntities.map((blockEntity, index) => {
           // console.log(`drawing block entity: ${entity.type} ${entity.coordinates}`)
-          if (entity.type === 'INSERT') {
-            return renderInsert(entity as Insert, index)
-          } else if (entity.type === 'ATTDEF') {
-
+          if (blockEntity.type === 'INSERT') {
+            // return renderInsert(blockEntity as Insert)
+            return null;
+          } else if (blockEntity.type === 'ATTDEF') {            
+              const attrib = insert.attribs?.find(attr => attr.tag === blockEntity.tag)
+              if(attrib) {
+                const attribText = attrib.text ?? blockEntity.text ?? ""
+                const [x, y] = attrib.coordinates
+                const textRotation = attrib.rotation ?? 0
+                return (
+                  <text key={uuid()} x={x} y={y} fill="black" transform={`rotate(${textRotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
+                    {attribText}
+                  </text>
+                )
+              } else return null;
           } else {
-            return renderEntity(entity, index)
+            return renderEntity(blockEntity)
           }
         }
         )}
@@ -400,9 +416,10 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
               <g key={layerIndex} id={layerName}>
                 {layers[layerName].map((entity, entityIndex) => {
                   if (entity.type === 'INSERT') {
-                    return renderInsert(entity as Insert, entityIndex);
+                    return renderInsert(entity as Insert);
+                  } else {
+                    return renderEntity(entity);
                   }
-                  return renderEntity(entity, entityIndex);
                 })}
               </g>
             ))}
