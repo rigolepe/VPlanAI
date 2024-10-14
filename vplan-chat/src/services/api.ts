@@ -30,6 +30,7 @@ export const sendMessageWithFunction = async (agent: Agent, message: string, con
     }, {
       headers: {
         'api-key': `${agent.apiKey}`,
+        'Authorization': `Bearer ${agent.apiKey}`,
       },
     });
 
