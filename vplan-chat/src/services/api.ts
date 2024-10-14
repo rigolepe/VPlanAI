@@ -2,27 +2,24 @@ import axios from 'axios';
 import { Agent } from '../types/agent';
 import { ChatMessage } from '../types/chat';
 
-export const sendMessageWithFunction = async (agent: Agent, message: string, context: string): Promise<{ assistantMessage: ChatMessage; functionCall?: any }> => {
+export const sendMessageWithFunction = async (agent: Agent, messages: ChatMessage[], context: string): Promise<{ assistantMessage: ChatMessage; functionCall?: any }> => {
   try { 
     const response = await axios.post(`${agent.apiUrl}`, {
       model: "gpt-3.5-turbo",
-      messages: [
-        { role: 'system', content: agent.systemPrompt },
-        { role: 'user', content: message }
-      ],
+      messages: messages,
       functions: [
         {
-          name: "getWeather",
-          description: "Get the weather forecast for a specific location",
+          name: "removeElement",
+          description: "Remove an element from the main array of the json by ID",
           parameters: {
             type: "object",
             properties: {
-              location: {
+              id: {
                 type: "string",
-                description: "The city and state, e.g., 'San Francisco, CA'"
+                description: "Id of a json element to delete, example: 808C814"
               }
             },
-            required: ["location"]
+            required: ["id"]
           }
         }
       ],
@@ -35,9 +32,8 @@ export const sendMessageWithFunction = async (agent: Agent, message: string, con
     });
 
     const assistantMessage: ChatMessage = {
-      sender: 'agent',
+      role: 'agent',
       content: response.data.choices[0].message.content || '',
-      timestamp: new Date(),
     };
 
     const functionCall = response.data.choices[0].message.function_call;
