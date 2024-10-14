@@ -38,6 +38,42 @@ interface SvgPanelProps {
   jsonData: Entity[]; // Expects the JSON data to adhere to the given schema
 }
 
+function getMinMaxCoordinates(entities: Entity[]) {
+  var minX = 1000000000.0;
+  var minY = 1000000000.0;
+  var maxX = -1000000000.0;
+  var maxY = -1000000000.0;
+
+  function updateMinMax(coords: Coordinates2D) {
+    minX = Math.min(minX, coords[0]);
+    minY = Math.min(minY, coords[1]);
+    maxX = Math.max(maxX, coords[0]);
+    maxY = Math.max(maxY, coords[1]);
+  }
+
+  const concreteTypes = ['POINT', 'LINE', 'POLYLINE', 'SOLID', 'CIRCLE', 'ARC', 'TEXT'];
+  const pointTypes = ['POINT', 'CIRCLE', 'ARC', 'TEXT'];
+  const lineTypes = ['LINE', 'POLYLINE', 'SOLID'];
+  if (entities.length > 0) {
+    entities.forEach(entity => {
+      if (concreteTypes.includes(entity.type)) {
+        if (pointTypes.includes(entity.type)) {
+          updateMinMax(entity.coordinates as Coordinates2D);
+        } else if (lineTypes.includes(entity.type)) {
+          (entity.coordinates as Coordinates2D[]).forEach(c => updateMinMax(c));
+        }
+      }
+    })
+  } else {
+    minX = 0;
+    minY = 0;
+    maxX = 100;
+    maxY = 100;
+  }
+
+  return [minX, minY, maxX, maxY];
+}
+
 // Helper function to group entities by layer
 function groupByLayer(entities: Entity[]): { [layer: string]: Entity[] } {
   return entities.reduce((acc, entity) => {
@@ -54,6 +90,9 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   const [layers, setLayers] = useState<{ [layer: string]: Entity[] }>({});
   const [blocks, setBlocks] = useState<{ [blockName: string]: Entity[] }>({});
   const [inVisibleLayers, setInvisibleLayers] = useState<string[]>([])
+  const [bounds, setBounds] = useState<number[]>([0, 0, 100, 100])
+  const [width, setWidth] = useState<number>(100)
+  const [height, setHeight] = useState<number>(100)
 
   // Load the JSON data and group by layers
   useEffect(() => {
@@ -72,10 +111,17 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
       }
     }
 
-      setBlocks(blockDefinitions); // Store the blocks for later use in inserts
-      setLayers(groupByLayer(topLevelEntities)); // Group non-block entities by layer
-    }
-  , [jsonData]);
+    setBlocks(blockDefinitions); // Store the blocks for later use in inserts
+    setLayers(groupByLayer(topLevelEntities)); // Group non-block entities by layer
+    const bounds = getMinMaxCoordinates(topLevelEntities)
+    setBounds(bounds)
+    const width = bounds[2] - bounds[0]; // max_x - min_x
+    const height = bounds[3] - bounds[1]; // max_y - min_y
+    setWidth(width)
+    setHeight(height)
+    console.log(`bounds: ${bounds}`)
+    console.log(`width: ${width}, height: ${height}`)
+  }, [jsonData]);
 
   // Helper function to transform points (scaling, rotation, and translation)
   const transformPoint = (
@@ -97,6 +143,10 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     // Translation
     return [xRot + translateX, yRot + translateY];
   };
+
+  const toRadians = (angle: number): number => {
+    return (angle * Math.PI) / 180.0
+  }
 
   // Drawing functions for each type of entity
   const renderEntity = (entity: Entity, key: number, transform?: any) => {
@@ -150,12 +200,18 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
       }
       case 'ARC': {
         const [cx, cy] = entity.coordinates as Coordinates2D;
-        const { radius, start_angle, end_angle } = entity;
-        // Rendering the arc is more complex and would involve path creation based on angles.
+        const [radius, start_angle, end_angle] = [entity.radius!, entity.start_angle!, entity.end_angle!];
+        const startX = cx + radius * Math.cos(toRadians(start_angle))
+        const startY = cy + radius * Math.sin(toRadians(start_angle))
+        const endX = cx + radius * Math.cos(toRadians(end_angle))
+        const endY = cy + radius * Math.sin(toRadians(end_angle))
+
+        const large_arc_flag = (end_angle - start_angle) > 180 ? 1 : 0;
+        
         return (
           <path
             key={key}
-            d={`M ${cx},${cy} A ${radius},${radius} ${start_angle},${end_angle}`}
+            d={`M ${startX},${startY} A ${radius},${radius} 0 ${large_arc_flag},1 ${endX},${endY}`}
             stroke="black"
             fill="none"
           />
@@ -211,7 +267,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         ))}
       </div>
       <div className={styles.svgContainer}>
-        <svg width="100%" height="100%">
+        <svg width="100%" height="100%" viewBox={`${bounds[0]} ${bounds[1]} ${width} ${height}`}>
           {Object.keys(layers).map((layerName, layerIndex) => (
             <g key={layerIndex} id={layerName}>
               {layers[layerName].map((entity, entityIndex) => {
