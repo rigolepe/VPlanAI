@@ -1,58 +1,89 @@
-import React, { useState, useEffect } from 'react';
-import { DataSource } from '../types/dataSource';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './DataSourceList.module.css';
 
-const DataSourceList: React.FC = () => {
-  const [dataSources, setDataSources] = useState<DataSource[]>([]);
+interface DataSourcesProps {
+  changeData:  (data: any) => void
+  jsonData: any
+}
+
+const DataSourceList: React.FC<DataSourcesProps> = (props: DataSourcesProps) => {
   const [svgDataSource, setSvgDataSource] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
 
   useEffect(() => {
-    // Load data sources from local storage
-    // This is a placeholder for the actual implementation
-    const loadedDataSources: DataSource[] = [
-      { id: '1', name: 'Data Source 1', includeInContext: true, data: []  },
-      { id: '2', name: 'Data Source 2', includeInContext: false, data: []  },
-      // Add more data sources as needed
-    ];
-    setDataSources(loadedDataSources);
   }, []);
 
-  const toggleIncludeInContext = (id: string) => {
-    setDataSources(dataSources.map(ds =>
-      ds.id === id ? { ...ds, includeInContext: !ds.includeInContext } : ds
-    ));
+  const handleDownload = () => {
+    console.log("Downloading data")
+    // Convert JSON data to a string
+    const jsonString = JSON.stringify(props.jsonData, null, 2);
+
+    // Create a blob with the JSON data
+    const blob = new Blob([jsonString], { type: 'application/json' });
+
+    // Create a temporary <a> element
+    const link = document.createElement('a');
+
+    // Create a URL for the blob and set it as the href attribute
+    link.href = URL.createObjectURL(blob);
+
+    // Set the download attribute to the desired file name
+    link.download = 'data.json';
+
+    // Append the <a> element to the document body
+    document.body.appendChild(link);
+
+    // Programmatically click the <a> to trigger the download
+    link.click();
+
+    // Clean up and remove the <a> element
+    document.body.removeChild(link);
   };
 
-  const handleSvgDataSourceSelect = (id: string) => {
-    setSvgDataSource(id === svgDataSource ? null : id);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event && event.target && event.target.files) {
+      const file = event.target.files[0];
+      if (file && file.type === 'application/json') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            if(e && e.target && e.target.result){
+              const data = JSON.parse(e.target.result as any);
+              props.changeData(data);
+            }
+          } catch (err) {
+            alert('Error parsing JSON file');
+            props.changeData(null);
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        alert('Please upload a valid JSON file');
+        props.changeData(null);
+      }
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
   };
 
   return (
     <div className={styles.dataSourceList}>
-      <h3>Data Sources</h3>
-      {dataSources.map(ds => (
-        <div key={ds.id} className={styles.dataSourceItem}>
-          <span>{ds.name}</span>
-          <label>
-            <input
-              type="checkbox"
-              checked={ds.includeInContext}
-              onChange={() => toggleIncludeInContext(ds.id)}
-            />
-            Include in Context
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="svgDataSource"
-              checked={ds.id === svgDataSource}
-              onChange={() => handleSvgDataSourceSelect(ds.id)}
-            />
-            Use for SVG
-          </label>
-        </div>
-      ))}
-      <button onClick={() => {/* Open modal to add new data source */}}>Add Data Source</button>
+      <h3>Data Source</h3>
+      {/* <span>{JSON.stringify(props.jsonData)}</span> */}
+      <div className={styles.dataSourceListButtons}>
+        <button onClick={() => handleDownload()}>Download JSON</button>
+        <input
+        type="file"
+        accept=".json"
+        onChange={handleFileChange}
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+      />
+      <button onClick={handleButtonClick}>Upload JSON</button>
+      </div>
     </div>
   );
 };

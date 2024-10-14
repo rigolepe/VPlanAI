@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Dispatch } from 'react';
 import ChatHistory from './ChatHistory';
 import AgentSelector from './AgentSelector';
 import DataSourceList from './DataSourceList';
@@ -11,9 +11,12 @@ interface ChatPanelProps {
   showAgentManager: boolean;
   toggleAgentManager: () => void;
   agents: Agent[];
+
+  changeData:  (data: any) => void
+  jsonData: any
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents, jsonData, changeData }) => {
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userMessage, setUserMessage] = useState('');
@@ -95,7 +98,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
           {loading ? 'Sending...' : 'Send'}
         </button>
       </div>
-      <DataSourceList />
+      <DataSourceList changeData={changeData} jsonData={jsonData} />
     </div>
   );
 };
