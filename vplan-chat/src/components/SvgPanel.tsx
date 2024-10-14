@@ -105,9 +105,13 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   const [height, setHeight] = useState<number>(100)
   const [viewBox, setViewBox] = useState<string>('0 0 -100 100'); // Manage the viewBox state
   const [zoom, setZoom] = useState<number>(1); // Track zoom level
-  const [translation, setTranslation] = useState<number[]>([0, 0]); // Track pan translation
+  // const [translation, setTranslation] = useState<number[]>([0, 0]); // Track pan translation
   const [isDragging, setIsDragging] = useState<boolean>(false); // Track drag state
   const lastMousePosition = useRef<{ x: number, y: number } | null>(null); // For drag events
+  const svgContainerRef = useRef<HTMLDivElement | null>(null);
+  const translationRef = useRef<[number, number]>([0, 0]); // Use ref for translation
+
+
 
   const defaultStrokeWidth = 0.1
 
@@ -141,12 +145,33 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   }, [jsonData, inVisibleLayers]);
 
   // Zoom event handler (mouse scroll)
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault(); // Prevent the default zoom behavior
+
     const zoomFactor = 1.1;
     const newZoom = e.deltaY < 0 ? zoom * zoomFactor : zoom / zoomFactor;
+
+    // Recalculate the viewBox based on the new zoom level
+    const newWidth = width / newZoom;
+    const newHeight = height / newZoom;
+
+    setViewBox(`${bounds[0] + translationRef.current[0]} ${-bounds[1] + translationRef.current[1]} ${newWidth} ${newHeight}`);
     setZoom(newZoom);
   };
+
+  // Add and remove event listeners for the wheel event
+  useEffect(() => {
+    const svgContainer = svgContainerRef.current;
+
+    if (svgContainer) {
+      svgContainer.addEventListener('wheel', handleWheel, { passive: false }); // Disable passive mode for wheel event
+
+      // Clean up the event listener when the component is unmounted
+      return () => {
+        svgContainer.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, [zoom, width, height, bounds]);
 
   // Mouse down to start dragging
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -159,15 +184,17 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     if (!isDragging || !lastMousePosition.current) return;
 
     const dx = e.clientX - lastMousePosition.current.x;
-    const dy = e.clientY - lastMousePosition.current.y;
+    const dy = -(e.clientY - lastMousePosition.current.y);
 
-    // Calculate the new translation
-    const newTranslation = [
-      translation[0] - dx / zoom, // Adjust translation based on zoom level
-      translation[1] - dy / zoom,
+    // Update the translation reference based on mouse movement
+    translationRef.current = [
+      translationRef.current[0] - dx / zoom,
+      translationRef.current[1] + dy / zoom,
     ];
 
-    setTranslation(newTranslation);
+    // Update the viewBox to reflect the dragging movement
+    setViewBox(`${bounds[0] + translationRef.current[0]} ${-bounds[1] + translationRef.current[1]} ${width / zoom} ${height / zoom}`);
+
     lastMousePosition.current = { x: e.clientX, y: e.clientY };
   };
 
@@ -178,9 +205,9 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   };
 
   // Update the viewBox when zoom or translation changes
-  useEffect(() => {
-    setViewBox(`${bounds[0] + translation[0]} ${-bounds[1] + translation[1]} ${width / zoom} ${height / zoom}`);
-  }, [zoom, translation, bounds, width, height]);
+  // useEffect(() => {
+  //   setViewBox(`${bounds[0] + translation[0]} ${-bounds[1] + translation[1]} ${width / zoom} ${height / zoom}`);
+  // }, [zoom, translation, bounds, width, height]);
 
 
   // Helper function to transform points (scaling, rotation, and translation)
@@ -248,9 +275,9 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         )
       }
       case 'SOLID': {
-        console.log(`SOLID coords before: ${entity.coordinates}`)
+        // console.log(`SOLID coords before: ${entity.coordinates}`)
         const coords = [...entity.coordinates, entity.coordinates[0]] as Coordinates2D[]
-        console.log(`SOLID coords: ${coords}`)
+        // console.log(`SOLID coords: ${coords}`)
         const points = coords.map((coord) => coord.join(',')).join(' ')
         return (
           <polyline
@@ -327,7 +354,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     return (
       <g key={key} transform={`rotate(${transform.rotation}, 0, 0) translate(${transform.translation[0]}, ${transform.translation[1]}) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
         {blockEntities.map((entity, index) => {
-          console.log(`drawing block entity: ${entity.type} ${entity.coordinates}`)
+          // console.log(`drawing block entity: ${entity.type} ${entity.coordinates}`)
           if (entity.type === 'INSERT') {
             return renderInsert(entity as Insert, index)
           } else if (entity.type === 'ATTDEF') {
@@ -360,7 +387,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         ))}
       </div>
       <div className={styles.svgContainer}
-        onWheel={handleWheel} // Zoom event
+        ref={svgContainerRef} // Attach the ref to the container
         onMouseDown={handleMouseDown} // Start drag
         onMouseMove={handleMouseMove} // Drag move
         onMouseUp={handleMouseUp} // End drag
