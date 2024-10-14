@@ -210,16 +210,14 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
 
   // Drawing functions for each type of entity
   const renderEntity = (entity: Entity, key: number) => {
-    var rendering = null
     switch (entity.type) {
       case 'POINT': {
         const [x, y] = entity.coordinates as Coordinates2D;
-        rendering = <circle key={key} cx={x} cy={y} r={2} fill="black" />
-        break
+        return <circle key={key} cx={x} cy={y} r={2} fill="black" />
       }
       case 'LINE': {
         const [start, end] = entity.coordinates as Coordinates2D[];
-        rendering = (
+        return (
           <line
             key={key}
             x1={start[0]}
@@ -230,15 +228,15 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             strokeWidth={defaultStrokeWidth}
           />
         )
-        break
       }
       case 'POLYLINE': {
         var coords = entity.coordinates as Coordinates2D[]
         if (entity.is_closed) {
           coords = [...entity.coordinates, entity.coordinates[0]] as Coordinates2D[]
         }
+        // console.log(`POLYLINE coords: ${coords}`)
         const points = coords.map((coord) => coord.join(',')).join(' ');
-        rendering = (
+        return (
           <polyline
             key={key}
             points={points}
@@ -248,11 +246,26 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             style={{ fill: entity.is_closed ? 'none' : undefined }}
           />
         )
-        break
+      }
+      case 'SOLID': {
+        console.log(`SOLID coords before: ${entity.coordinates}`)
+        const coords = [...entity.coordinates, entity.coordinates[0]] as Coordinates2D[]
+        console.log(`SOLID coords: ${coords}`)
+        const points = coords.map((coord) => coord.join(',')).join(' ')
+        return (
+          <polyline
+            key={key}
+            points={points}
+            fill="gray"
+            stroke="black"
+            strokeWidth={defaultStrokeWidth}
+            style={{ fill: entity.is_closed ? 'none' : undefined }}
+          />
+        )
       }
       case 'CIRCLE': {
         const [x, y] = entity.coordinates as Coordinates2D;
-        rendering = (
+        return (
           <circle
             key={key}
             cx={x}
@@ -263,7 +276,6 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             strokeWidth={defaultStrokeWidth}
           />
         )
-        break
       }
       case 'ARC': {
         const [x, y] = entity.coordinates as Coordinates2D;
@@ -275,7 +287,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
 
         const large_arc_flag = (end_angle - start_angle) > 180 ? 1 : 0;
 
-        rendering = (
+        return (
           <path
             key={key}
             d={`M ${startX},${startY} A ${radius},${radius} 0 ${large_arc_flag},1 ${endX},${endY}`}
@@ -284,22 +296,19 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             strokeWidth={defaultStrokeWidth}
           />
         )
-        break
       }
       case 'TEXT': {
         const [x, y] = entity.coordinates as Coordinates2D;
         const rotation = entity.rotation ?? 0
-        rendering = (
+        return (
           <text key={key} x={x} y={y} fontSize={entity.height} fill="black" transform={`rotate(${rotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
             {entity.text}
           </text>
         )
-        break
       }
       default:
-        break;
+        return null;
     }
-    return rendering
   };
 
   // Render a block entity, using the coordinates of the insert
@@ -307,7 +316,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     const blockEntities = blocks[insert.name];
     if (!blockEntities) return null;
     // todo de ATTRIB ook nog toevoegen in het block insert
-    // todo checken of we de recursieve inserts (die in de blocks zitten) ook getekend worden
+
 
     const transform: Transformation = {
       scale: [insert.xscale ?? 1, insert.yscale ?? 1],
@@ -318,8 +327,11 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     return (
       <g key={key} transform={`rotate(${transform.rotation}, 0, 0) translate(${transform.translation[0]}, ${transform.translation[1]}) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
         {blockEntities.map((entity, index) => {
+          console.log(`drawing block entity: ${entity.type} ${entity.coordinates}`)
           if (entity.type === 'INSERT') {
             return renderInsert(entity as Insert, index)
+          } else if (entity.type === 'ATTDEF') {
+
           } else {
             return renderEntity(entity, index)
           }
