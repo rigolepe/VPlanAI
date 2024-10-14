@@ -20,6 +20,9 @@ interface Entity {
   text?: string;
   height?: number;
   color?: number;
+  rotation?: number;
+  xscale?: number;
+  yscale?: number;
   [key: string]: any; // Extendable for other properties
 }
 
@@ -36,6 +39,12 @@ interface Block {
 
 interface SvgPanelProps {
   jsonData: Entity[]; // Expects the JSON data to adhere to the given schema
+}
+
+interface Transformation {
+  scale: Coordinates2D,
+  rotation: number,
+  translation: Coordinates2D,
 }
 
 function getMinMaxCoordinates(entities: Entity[]) {
@@ -149,15 +158,17 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   }
 
   // Drawing functions for each type of entity
-  const renderEntity = (entity: Entity, key: number, transform?: any) => {
+  const renderEntity = (entity: Entity, key: number) => {
+    var rendering = null
     switch (entity.type) {
       case 'POINT': {
         const [x, y] = entity.coordinates as Coordinates2D;
-        return <circle key={key} cx={x} cy={y} r={2} fill="black" />;
+        rendering = <circle key={key} cx={x} cy={y} r={2} fill="black" />
+        break
       }
       case 'LINE': {
         const [start, end] = entity.coordinates as Coordinates2D[];
-        return (
+        rendering = (
           <line
             key={key}
             x1={start[0]}
@@ -167,13 +178,14 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             stroke="black"
             strokeWidth="1"
           />
-        );
+        )
+        break
       }
       case 'POLYLINE': {
         const points = (entity.coordinates as Coordinates2D[])
           .map((coord) => coord.join(','))
           .join(' ');
-        return (
+        rendering = (
           <polyline
             key={key}
             points={points}
@@ -182,67 +194,77 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             strokeWidth="1"
             style={{ fill: entity.is_closed ? 'none' : undefined }}
           />
-        );
+        )
+        break
       }
       case 'CIRCLE': {
-        const [cx, cy] = entity.coordinates as Coordinates2D;
-        return (
+        const [x, y] = entity.coordinates as Coordinates2D;
+        rendering = (
           <circle
             key={key}
-            cx={cx}
-            cy={cy}
+            cx={x}
+            cy={y}
             r={entity.radius}
             stroke="black"
             fill="none"
             strokeWidth="1"
           />
-        );
+        )
+        break
       }
       case 'ARC': {
-        const [cx, cy] = entity.coordinates as Coordinates2D;
+        const [x, y] = entity.coordinates as Coordinates2D;
         const [radius, start_angle, end_angle] = [entity.radius!, entity.start_angle!, entity.end_angle!];
-        const startX = cx + radius * Math.cos(toRadians(start_angle))
-        const startY = cy + radius * Math.sin(toRadians(start_angle))
-        const endX = cx + radius * Math.cos(toRadians(end_angle))
-        const endY = cy + radius * Math.sin(toRadians(end_angle))
+        const startX = x + radius * Math.cos(toRadians(start_angle))
+        const startY = y + radius * Math.sin(toRadians(start_angle))
+        const endX = x + radius * Math.cos(toRadians(end_angle))
+        const endY = y + radius * Math.sin(toRadians(end_angle))
 
         const large_arc_flag = (end_angle - start_angle) > 180 ? 1 : 0;
-        
-        return (
+
+        rendering = (
           <path
             key={key}
             d={`M ${startX},${startY} A ${radius},${radius} 0 ${large_arc_flag},1 ${endX},${endY}`}
             stroke="black"
             fill="none"
           />
-        );
+        )
+        break
       }
       case 'TEXT': {
         const [x, y] = entity.coordinates as Coordinates2D;
-        return (
-          <text key={key} x={x} y={y} fontSize={entity.height} fill="black">
+        const rotation = entity.rotation ?? 0
+        rendering = (
+          <text key={key} x={x} y={y} fontSize={entity.height} fill="black" transform={`rotate(${rotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
             {entity.text}
           </text>
-        );
+        )
+        break
       }
       default:
-        return null;
+        break;
     }
+    return rendering
   };
 
   // Render a block entity, using the coordinates of the insert
   const renderInsert = (insert: Insert, key: number) => {
     const blockEntities = blocks[insert.name];
     if (!blockEntities) return null;
+    // todo de ATTRIB ook nog toevoegen in het block insert
+    // todo checken of we de recursieve inserts (die in de blocks zitten) ook getekend worden
+
+    const transform: Transformation = {
+      scale: [insert.xscale ?? 1, insert.yscale ?? 1],
+      rotation: insert.rotation ?? 0,
+      translation: insert.coordinates as Coordinates2D,
+    }
 
     return (
-      <g key={key}>
+      <g key={key}transform={`rotate(${transform.rotation}, 0, 0) translate(${transform.translation[0]}, ${transform.translation[1]}) scale(${transform.scale[0]}, ${transform.scale[1]})`}>
         {blockEntities.map((entity, index) =>
-          renderEntity(entity, index, {
-            scale: [1, 1],
-            rotation: 0,
-            translation: insert.coordinates as Coordinates2D,
-          })
+          renderEntity(entity, index)
         )}
       </g>
     );
@@ -267,17 +289,19 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         ))}
       </div>
       <div className={styles.svgContainer}>
-        <svg width="100%" height="100%" viewBox={`${bounds[0]} ${bounds[1]} ${width} ${height}`}>
-          {Object.keys(layers).map((layerName, layerIndex) => (
-            <g key={layerIndex} id={layerName}>
-              {layers[layerName].map((entity, entityIndex) => {
-                if (entity.type === 'INSERT') {
-                  return renderInsert(entity as Insert, entityIndex);
-                }
-                return renderEntity(entity, entityIndex);
-              })}
-            </g>
-          ))}
+        <svg width="100%" height="100%" viewBox={`${bounds[0]} ${-bounds[1]} ${width} ${height}`}>
+          <g transform={`translate(0, ${height}) scale(1, -1)`}>
+            {Object.keys(layers).map((layerName, layerIndex) => (
+              <g key={layerIndex} id={layerName}>
+                {layers[layerName].map((entity, entityIndex) => {
+                  if (entity.type === 'INSERT') {
+                    return renderInsert(entity as Insert, entityIndex);
+                  }
+                  return renderEntity(entity, entityIndex);
+                })}
+              </g>
+            ))}
+          </g>
         </svg>
       </div>
     </div>
