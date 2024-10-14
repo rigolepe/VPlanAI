@@ -10,8 +10,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ history }) => {
   return (
     <div className={styles.chatHistory}>
       {history.map((message, index) => (
-        <div key={index} className={`${styles.message} ${styles[message.sender]}`}>
-          <span className={styles.sender}>{message.sender}</span>
+        <div key={index} className={`${styles.message} ${styles[message.role]}`}>
+          <span className={styles.sender}>{message.role}</span>
           <p>{message.content}</p>
         </div>
       ))}

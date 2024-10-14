@@ -25,20 +25,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
   const handleSendMessage = async () => {
     if (currentAgent && userMessage.trim()) {
       const newMessage: ChatMessage = {
-        sender: 'user',
+        role: 'user',
         content: userMessage,
-        timestamp: new Date(),
       };
       setChatHistory(prev => [...prev, newMessage]);
       setUserMessage('');
       setLoading(true);
 
       try {
-        const response = await sendMessageWithFunction(currentAgent, userMessage, '');
+        const response = await sendMessageWithFunction(currentAgent,  [...chatHistory, newMessage], '');
         const { assistantMessage, functionCall } = response;
-
-        setChatHistory(prev => [...prev, assistantMessage]);
-
+        
+        setChatHistory(prev => [...prev, {
+            role: 'system',
+            content: assistantMessage.content,
+          } as ChatMessage
+        ]);
+        
         // Handle the function call from OpenAI, if present
         if (functionCall) {
           handleFunctionCall(functionCall);
@@ -59,13 +62,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
 
       // Send the result of the function back to the chat
       const functionResult: ChatMessage = {
-        sender: 'agent',
+        role: 'agent',
         content: `The weather in ${functionArgs.location} is ${weatherData.temperature}°C with ${weatherData.description}.`,
-        timestamp: new Date(),
       };
       setChatHistory(prev => [...prev, functionResult]);
     }
+
+    if(functionCall.name === "removeElement"){
+      const functionArgs = JSON.parse(functionCall.arguments);
+      await removeElement(functionArgs.id); // Example function
+    }
   };
+
+  const removeElement = async( id: string) => {
+    console.log("called function to delete element: ", id)
+  }
 
   const getWeather = async (location: string) => {
     // This is a mock function to simulate getting weather data

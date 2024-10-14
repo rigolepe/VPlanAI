@@ -1,7 +1,6 @@
 export interface ChatMessage {
-  sender: 'user' | 'agent';
+  role: 'user' | 'agent' | 'system';
   content: string;
-  timestamp: Date;
 }
 
 export interface ChatHistory {
