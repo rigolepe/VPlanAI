@@ -59,20 +59,23 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   useEffect(() => {
     const blockDefinitions: { [blockName: string]: Entity[] } = {};
     const topLevelEntities: Entity[] = [];
-
-    // Separate blocks from top-level entities
-    for (const entity of jsonData) {
-      if (entity.type === 'BLOCK') {
-        const blockEntity = entity as unknown as Block;
-        blockDefinitions[blockEntity.block_name] = blockEntity.entities;
-      } else {
-        topLevelEntities.push(entity);
+    console.log(jsonData)
+    if (jsonData && Array.isArray(jsonData)) {
+      // Separate blocks from top-level entities
+      for (const entity of jsonData) {
+        if (entity.type === 'BLOCK') {
+          const blockEntity = entity as unknown as Block;
+          blockDefinitions[blockEntity.block_name] = blockEntity.entities;
+        } else {
+          topLevelEntities.push(entity);
+        }
       }
     }
 
-    setBlocks(blockDefinitions); // Store the blocks for later use in inserts
-    setLayers(groupByLayer(topLevelEntities)); // Group non-block entities by layer
-  }, [jsonData]);
+      setBlocks(blockDefinitions); // Store the blocks for later use in inserts
+      setLayers(groupByLayer(topLevelEntities)); // Group non-block entities by layer
+    }
+  , [jsonData]);
 
   // Helper function to transform points (scaling, rotation, and translation)
   const transformPoint = (

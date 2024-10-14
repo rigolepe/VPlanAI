@@ -29,7 +29,7 @@ export const sendMessageWithFunction = async (agent: Agent, message: string, con
       function_call: "auto", // This will automatically call the function if needed
     }, {
       headers: {
-        'Authorization': `Bearer ${agent.apiKey}`,
+        'api-key': `${agent.apiKey}`,
       },
     });
 
