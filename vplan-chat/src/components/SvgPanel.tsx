@@ -130,7 +130,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     setHeight(height)
     console.log(`bounds: ${bounds}`)
     console.log(`width: ${width}, height: ${height}`)
-  }, [jsonData]);
+  }, [jsonData, inVisibleLayers]);
 
   // Helper function to transform points (scaling, rotation, and translation)
   const transformPoint = (
@@ -291,7 +291,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
       <div className={styles.svgContainer}>
         <svg width="100%" height="100%" viewBox={`${bounds[0]} ${-bounds[1]} ${width} ${height}`}>
           <g transform={`translate(0, ${height}) scale(1, -1)`}>
-            {Object.keys(layers).map((layerName, layerIndex) => (
+            {Object.keys(layers).filter((layerName, layerIndex)=> !inVisibleLayers.includes(layerName)).map((layerName, layerIndex) => (
               <g key={layerIndex} id={layerName}>
                 {layers[layerName].map((entity, entityIndex) => {
                   if (entity.type === 'INSERT') {
