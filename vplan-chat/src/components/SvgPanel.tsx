@@ -10,6 +10,8 @@ import { Block, Coordinates2D, Entity, Insert } from '../types/entity';
 
 interface SvgPanelProps {
   jsonData: Entity[]; // Expects the JSON data to adhere to the given schema
+  filteredJsonData: Entity[];
+  changeFilteredJson: (data: any) => void
 }
 
 interface Transformation {
@@ -66,7 +68,7 @@ function groupByLayer(entities: Entity[]): { [layer: string]: Entity[] } {
 }
 
 // React component for rendering the dynamic SVG
-const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
+const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, filteredJsonData, changeFilteredJson }) => {
   const [layers, setLayers] = useState<{ [layer: string]: Entity[] }>({});
   const [blocks, setBlocks] = useState<{ [blockName: string]: Entity[] }>({});
   const [inVisibleLayers, setInvisibleLayers] = useLocalStorage<string[]>('inVisibleLayers', [])
@@ -86,33 +88,43 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
 
   // Load the JSON data and group by layers
   useEffect(() => {
-    const blockDefinitions: { [blockName: string]: Entity[] } = {};
-    const topLevelEntities: Entity[] = [];
-    console.log(jsonData)
+    const topLevelEntitiesOriginalJson: Entity[] = [];
+    const blockDefinitionsFilteredJson: { [blockName: string]: Entity[] } = {};
+    const topLevelEntitiesFilteredJson: Entity[] = [];
+    
     if (jsonData && Array.isArray(jsonData)) {
       // Separate blocks from top-level entities
       for (const entity of jsonData) {
-        if (entity.type === 'BLOCK') {
-          const blockEntity = entity as unknown as Block;
-          blockDefinitions[blockEntity.block_name] = blockEntity.entities;
-        } else {
-          topLevelEntities.push(entity);
+        if (entity.type !== 'BLOCK') {
+          topLevelEntitiesOriginalJson.push(entity);
         }
       }
     }
 
-    setBlocks(blockDefinitions); // Store the blocks for later use in inserts
-    setLayers(groupByLayer(topLevelEntities)); // Group non-block entities by layer
-    const bounds = getMinMaxCoordinates(topLevelEntities)
+    if (filteredJsonData && Array.isArray(filteredJsonData)) {
+      // Separate blocks from top-level entities
+      for (const entity of filteredJsonData) {
+        if (entity.type === 'BLOCK') {
+          const blockEntity = entity as unknown as Block;
+          blockDefinitionsFilteredJson[blockEntity.block_name] = blockEntity.entities;
+        } else {
+          topLevelEntitiesFilteredJson.push(entity);
+        }
+      }
+    }
+
+    setBlocks(blockDefinitionsFilteredJson); // Store the blocks for later use in inserts
+    setLayers(groupByLayer(topLevelEntitiesOriginalJson)); // Group non-block entities by layer
+    const bounds = getMinMaxCoordinates(topLevelEntitiesFilteredJson)
     setBounds(bounds)
     const width = bounds[2] - bounds[0]; // max_x - min_x
     const height = bounds[3] - bounds[1]; // max_y - min_y
     setWidth(width)
     setHeight(height)
-    console.log(`bounds: ${bounds}`)
-    console.log(`width: ${width}, height: ${height}`)
+    // console.log(`bounds: ${bounds}`)
+    // console.log(`width: ${width}, height: ${height}`)
     setViewBox(`${bounds[0] + translationRef.current[0]} ${-bounds[1] + translationRef.current[1]} ${width / zoom} ${height / zoom}`);
-  }, [jsonData, inVisibleLayers]);
+  }, [jsonData, inVisibleLayers, filteredJsonData]);
 
   // Zoom event handler (mouse scroll)
   const handleWheel = (e: WheelEvent) => {
@@ -384,8 +396,17 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   };
 
   const toggleLayer = (name: string) => {
-    if (inVisibleLayers.includes(name)) setInvisibleLayers(inVisibleLayers.filter(layer => layer !== name))
-    else setInvisibleLayers([...inVisibleLayers, name])
+    if (inVisibleLayers.includes(name)) 
+      setInvisibleLayers(inVisibleLayers.filter(layer => layer !== name))
+    else 
+      setInvisibleLayers([...inVisibleLayers, name])
+
+    changeFilteredJson(jsonData.filter((e: any) => {
+      if(e && e.layer)
+        return !inVisibleLayers.includes(e.layer)
+
+      return true;
+    }))
   };
 
   return (

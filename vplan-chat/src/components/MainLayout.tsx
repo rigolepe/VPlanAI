@@ -14,6 +14,7 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentManager, agents }) => {
   const [splitPosition, setSplitPosition] = useState(50); // Default position: 50% split
   const [jsonData, setJsonData] = useState<any>({});
+  const [filteredJsonData, setFilteredJsonData] = useState<any>({});
   const [isDragging, setIsDragging] = useState(false); // To track if the user is dragging
 
   const handleSplitDrag = (e: React.MouseEvent) => {
@@ -50,8 +51,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
     };
   }, [isDragging]);
 
-  const changeData = (data: any) => {
-    console.log('setting data: ', data);
+  const changeData = (data: any) => { // if this function is called, a new json is uploaded
+    setFilteredJsonData(data);
     setJsonData(data);
   };
 
@@ -66,10 +67,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
     return `${entities.length} entities added to the dataset and drawing.`
   }
 
+  const changeFilteredJson = (data: any) => {
+    setFilteredJsonData(data)
+  }
+
   return (
     <div className={styles.mainLayout}>
       <div className={styles.svgPanel} style={{ width: `${splitPosition}%` }}>
-        <SvgPanel jsonData={jsonData} />
+        <SvgPanel jsonData={jsonData} filteredJsonData={filteredJsonData} changeFilteredJson={changeFilteredJson} />
       </div>
       <div className={styles.splitter} onMouseDown={handleSplitDrag}></div>
       <div className={styles.chatPanel} style={{ width: `${100 - splitPosition}%` }}>
@@ -77,7 +82,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
           showAgentManager={showAgentManager}
           toggleAgentManager={toggleAgentManager}
           agents={agents}
-          jsonData={jsonData}
+          jsonData={filteredJsonData}
           changeData={changeData}
           addEntities={addEntities}
         />
