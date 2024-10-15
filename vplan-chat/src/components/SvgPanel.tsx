@@ -450,9 +450,14 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, filteredJsonData, changeF
     }))
   };
 
+  const resetFilter = () => {
+    setInvisibleLayers([])
+  }
+
   return (
     <div className={styles.svgPanel}>
       <div className={styles.sidebar}>
+        <button key="reset filters" onClick={() => resetFilter()} className={styles.resetFilter}>Reset filters</button>
         {Object.keys(layers).map((layerName, layerIndex) => (
           <button
             key={layerName}
