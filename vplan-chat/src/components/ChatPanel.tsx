@@ -13,16 +13,32 @@ interface ChatPanelProps {
   toggleAgentManager: () => void;
   agents: Agent[];
 
-  changeData:  (data: any) => void
+  changeData: (data: any) => void
   addEntities: (entities: Entity[]) => string
-  jsonData: any
+  jsonData: Entity[]
+  filteredJsonData: Entity[]
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents, jsonData, changeData, addEntities }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents, jsonData, filteredJsonData, changeData, addEntities }) => {
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userMessage, setUserMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const lowLevelDataFilter = (entities: Entity[]) => {
+    // Predefined list of keys to be set to undefined
+    const keysToSetUndefined = ["linetype", "color", "attribs", "elevation", "flags", "height", "prompt", "id"];
+    // Use JSON.stringify with a custom replacer function
+    const jsonString = JSON.stringify(entities, (key, value) => {
+      // If the key is in the list, return undefined
+      if (keysToSetUndefined.includes(key)) {
+        return undefined;
+      }
+      // Otherwise return the original value
+      return value;
+    });
+    return jsonString
+  }
 
   const handleSendMessage = async () => {
     if (currentAgent && userMessage.trim()) {
@@ -30,25 +46,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
         role: 'user',
         content: userMessage,
       };
+      const dataChatMessage: ChatMessage = {
+        role: 'user',
+        content: `# Our JSON DXF dataset:\n\n${lowLevelDataFilter(filteredJsonData)}`
+      }
       setChatHistory(prev => [...prev, newMessage]);
       setUserMessage('');
       setLoading(true);
 
       try {
-        const response = await sendMessageWithFunction(currentAgent,  [...chatHistory, newMessage], '');
+        const response = await sendMessageWithFunction(currentAgent, [dataChatMessage, ...chatHistory, newMessage], '');
         const { assistantMessage, functionCall } = response;
         var functionDescription = ""
         if (functionCall?.description) {
           functionDescription = `\n\n${functionCall?.description}`
         }
         const messageContent = assistantMessage.content + functionDescription
-        
+
         setChatHistory(prev => [...prev, {
-            role: 'system',
-            content: messageContent,
-          } as ChatMessage
+          role: 'system',
+          content: messageContent,
+        } as ChatMessage
         ]);
-        
+
         // Handle the function call from OpenAI, if present
         if (functionCall) {
           handleFunctionCall(functionCall);
@@ -75,12 +95,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
       setChatHistory(prev => [...prev, functionResult]);
     }
 
-    if(functionCall.name === "removeElement"){
+    if (functionCall.name === "removeElement") {
       const functionArgs = JSON.parse(functionCall.arguments);
       await removeElement(functionArgs.id); // Example function
     }
 
-    if(functionCall.name === "addEntities"){
+    if (functionCall.name === "addEntities") {
       const functionArgs = JSON.parse(functionCall.arguments);
       const entities: Entity[] = functionArgs as Entity[]
       const addResult = addEntities(entities)
@@ -94,7 +114,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
 
   };
 
-  const removeElement = async( id: string) => {
+  const removeElement = async (id: string) => {
     console.log("called function to delete element: ", id)
   }
 

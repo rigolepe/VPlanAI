@@ -3,15 +3,12 @@ import styles from './SvgPanel.module.css';
 import { useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import useLocalStorage from '../hooks/useLocalStorage';
-import { Block, Coordinates2D, Entity, Insert } from '../types/entity';
-
-
+import { Block, CONCRETE_TYPES, Coordinates2D, Entity, Insert, LINE_BASED, POINT_BASED } from '../types/entity';
 
 
 interface SvgPanelProps {
   jsonData: Entity[]; // Expects the JSON data to adhere to the given schema
-  filteredJsonData: Entity[];
-  changeFilteredJson: (data: any) => void
+  changeFilteredJson: (data: Entity[]) => void
 }
 
 interface Transformation {
@@ -33,15 +30,12 @@ function getMinMaxCoordinates(entities: Entity[]) {
     maxY = Math.max(maxY, coords[1]);
   }
 
-  const concreteTypes = ['POINT', 'LINE', 'POLYLINE', 'SOLID', 'CIRCLE', 'ARC', 'TEXT'];
-  const pointTypes = ['POINT', 'CIRCLE', 'ARC', 'TEXT'];
-  const lineTypes = ['LINE', 'POLYLINE', 'SOLID'];
   if (entities.length > 0) {
     entities.forEach(entity => {
-      if (concreteTypes.includes(entity.type)) {
-        if (pointTypes.includes(entity.type)) {
+      if (CONCRETE_TYPES.includes(entity.type)) {
+        if (POINT_BASED.includes(entity.type)) {
           updateMinMax(entity.coordinates as Coordinates2D);
-        } else if (lineTypes.includes(entity.type)) {
+        } else if (LINE_BASED.includes(entity.type)) {
           (entity.coordinates as Coordinates2D[]).forEach(c => updateMinMax(c));
         }
       }
@@ -68,16 +62,15 @@ function groupByLayer(entities: Entity[]): { [layer: string]: Entity[] } {
 }
 
 // React component for rendering the dynamic SVG
-const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, filteredJsonData, changeFilteredJson }) => {
+const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, changeFilteredJson }) => {
   const [layers, setLayers] = useState<{ [layer: string]: Entity[] }>({});
-  const [blocks, setBlocks] = useState<{ [blockName: string]: Entity[] }>({});
+  const [blocks, setBlocks] = useState<{ [blockName: string]: Block }>({});
   const [inVisibleLayers, setInvisibleLayers] = useLocalStorage<string[]>('inVisibleLayers', [])
   const [bounds, setBounds] = useState<number[]>([0, 0, 100, 100])
   const [width, setWidth] = useState<number>(100)
   const [height, setHeight] = useState<number>(100)
   const [viewBox, setViewBox] = useState<string>('0 0 -100 100'); // Manage the viewBox state
   const [zoom, setZoom] = useState<number>(1); // Track zoom level
-  // const [translation, setTranslation] = useState<number[]>([0, 0]); // Track pan translation
   const [isDragging, setIsDragging] = useState<boolean>(false); // Track drag state
   const lastMousePosition = useRef<{ x: number, y: number } | null>(null); // For drag events
   const svgContainerRef = useRef<HTMLDivElement | null>(null);
@@ -88,43 +81,32 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, filteredJsonData, changeF
 
   // Load the JSON data and group by layers
   useEffect(() => {
-    const topLevelEntitiesOriginalJson: Entity[] = [];
-    const blockDefinitionsFilteredJson: { [blockName: string]: Entity[] } = {};
-    const topLevelEntitiesFilteredJson: Entity[] = [];
-    
+    const topLevelEntities: Entity[] = [];
+    const blockDefinitions: { [blockName: string]: Block } = {};
+
     if (jsonData && Array.isArray(jsonData)) {
       // Separate blocks from top-level entities
       for (const entity of jsonData) {
-        if (entity.type !== 'BLOCK') {
-          topLevelEntitiesOriginalJson.push(entity);
-        }
-      }
-    }
-
-    if (filteredJsonData && Array.isArray(filteredJsonData)) {
-      // Separate blocks from top-level entities
-      for (const entity of filteredJsonData) {
         if (entity.type === 'BLOCK') {
           const blockEntity = entity as unknown as Block;
-          blockDefinitionsFilteredJson[blockEntity.block_name] = blockEntity.entities;
+          blockDefinitions[blockEntity.block_name] = blockEntity;
         } else {
-          topLevelEntitiesFilteredJson.push(entity);
+          topLevelEntities.push(entity);
         }
       }
     }
 
-    setBlocks(blockDefinitionsFilteredJson); // Store the blocks for later use in inserts
-    setLayers(groupByLayer(topLevelEntitiesOriginalJson)); // Group non-block entities by layer
-    const bounds = getMinMaxCoordinates(topLevelEntitiesFilteredJson)
+    setBlocks(blockDefinitions); // Store the blocks for later use in inserts
+    setLayers(groupByLayer(topLevelEntities)); // Group non-block entities by layer
+    const bounds = getMinMaxCoordinates(topLevelEntities)
     setBounds(bounds)
     const width = bounds[2] - bounds[0]; // max_x - min_x
     const height = bounds[3] - bounds[1]; // max_y - min_y
     setWidth(width)
     setHeight(height)
-    // console.log(`bounds: ${bounds}`)
-    // console.log(`width: ${width}, height: ${height}`)
     setViewBox(`${bounds[0] + translationRef.current[0]} ${-bounds[1] + translationRef.current[1]} ${width / zoom} ${height / zoom}`);
-  }, [jsonData, inVisibleLayers, filteredJsonData]);
+    updateFilteredJson()
+  }, [jsonData, inVisibleLayers]);
 
   // Zoom event handler (mouse scroll)
   const handleWheel = (e: WheelEvent) => {
@@ -358,7 +340,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, filteredJsonData, changeF
 
   // Render a block entity, using the coordinates of the insert
   const renderInsert = (insert: Insert) => {
-    const blockEntities = blocks[insert.name];
+    const blockEntities = blocks[insert.name].entities;
     if (!blockEntities) return null;
 
     const transform: Transformation = {
@@ -396,18 +378,40 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, filteredJsonData, changeF
   };
 
   const toggleLayer = (name: string) => {
-    if (inVisibleLayers.includes(name)) 
-      setInvisibleLayers(inVisibleLayers.filter(layer => layer !== name))
-    else 
-      setInvisibleLayers([...inVisibleLayers, name])
+    if (inVisibleLayers.includes(name)) setInvisibleLayers(inVisibleLayers.filter(layer => layer !== name))
+    else setInvisibleLayers([...inVisibleLayers, name])
 
-    changeFilteredJson(jsonData.filter((e: any) => {
-      if(e && e.layer)
-        return !inVisibleLayers.includes(e.layer)
-
-      return true;
-    }))
+    updateFilteredJson()
   };
+
+  const roundCoordinates = (entity: Entity): Entity => {
+    return entity
+  }
+
+  const updateFilteredJson = () => {
+    // Filter blocks en entities voor chat.
+
+    const topLevelFilteredEntities =
+      jsonData
+        .filter((e: Entity) => !inVisibleLayers.includes(e.layer))
+        // .map((e: Entity) => roundCoordinates(e)) 
+    const insertBlockNamesSet: Set<string> = new Set(topLevelFilteredEntities.filter(entity => entity.type === "INSERT").map(entity => entity.name));
+    const filteredBlockEntities =
+      Object.values(blocks)
+        .filter(block => insertBlockNamesSet.has(block.block_name))
+        .map(block => {
+          block.entities = block.entities.filter(entity => !["ATTDEF", "ATTRIB"].includes(entity.type))
+          return block
+        })
+        // .map((e: Entity) => roundCoordinates(e)) 
+    console.log(`Using ${filteredBlockEntities.length} blocks of ${Object.keys(blocks).length}`)
+
+    // Welke blocks worden effectief gebruikt? 
+    const filteredJson: Entity[] = [...filteredBlockEntities, ...topLevelFilteredEntities]
+
+    changeFilteredJson(filteredJson)
+  }
+
 
   const resetFilter = () => {
     setInvisibleLayers([])

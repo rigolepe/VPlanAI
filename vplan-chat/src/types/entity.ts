@@ -29,7 +29,7 @@ export interface Insert extends Entity {
     attribs?: Attrib[]; // Inserted attributes (ignored for now)
 }
 
-export interface Block {
+export interface Block extends Entity {
     id: string;
     block_name: string;
     entities: Entity[];
@@ -41,3 +41,7 @@ export interface Attrib {
     rotation?: number;
     tag: string;
 }
+
+export const POINT_BASED = ['POINT', 'CIRCLE', 'ARC', 'TEXT', 'INSERT'];
+export const LINE_BASED = ['LINE', 'POLYLINE', 'SOLID'];
+export const CONCRETE_TYPES = ['POINT', 'LINE', 'POLYLINE', 'SOLID', 'CIRCLE', 'ARC', 'TEXT']

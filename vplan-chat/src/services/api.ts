@@ -5,7 +5,9 @@ import { ChatMessage } from '../types/chat';
 export const sendMessageWithFunction = async (agent: Agent, messages: ChatMessage[], context: string): Promise<{ assistantMessage: ChatMessage; functionCall?: any }> => {
   try {
     const response = await axios.post(`${agent.apiUrl}`, {
-      model: "gpt-3.5-turbo",
+      // model: "gpt-3.5-turbo",
+      model: "gpt-4o-mini",
+      // model: "gpt-4o-2024-05-13",
       messages: messages,
       functions: [
         {
