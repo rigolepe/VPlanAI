@@ -20,6 +20,11 @@
   cursor: pointer;
 }
 
+.sidebar button.resetFilter {
+  background-color: red;
+  color: white;
+}
+
 .sidebar button.active {
   background-color: #007bff;
   color: white;
