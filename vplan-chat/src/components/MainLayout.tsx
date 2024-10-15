@@ -3,6 +3,7 @@ import SvgPanel from './SvgPanel';
 import ChatPanel from './ChatPanel';
 import styles from './MainLayout.module.css';
 import { Agent } from '../types/agent';
+import { Entity } from '../types/entity';
 
 interface MainLayoutProps {
   showAgentManager: boolean;
@@ -55,6 +56,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
     setJsonData(data);
   };
 
+  const addEntities = (entities: Entity[]) => {
+    console.log(`adding ${entities.length} entities`)
+    if (jsonData && Array.isArray(jsonData)) {
+      const data = jsonData as Entity[]
+      setJsonData([...data, ...entities])
+    } else {
+      setJsonData(entities)
+    }
+    return `${entities.length} entities added to the dataset and drawing.`
+  }
+
   const changeFilteredJson = (data: any) => {
     setFilteredJsonData(data)
   }
@@ -72,6 +84,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
           agents={agents}
           jsonData={filteredJsonData}
           changeData={changeData}
+          addEntities={addEntities}
         />
       </div>
     </div>
