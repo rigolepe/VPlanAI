@@ -3,51 +3,10 @@ import styles from './SvgPanel.module.css';
 import { useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import useLocalStorage from '../hooks/useLocalStorage';
+import { Block, Coordinates2D, Entity, Insert } from '../types/entity';
 
 
-// Define the interface for the entities based on the JSON schema
-interface Coordinates2D extends Array<number> {
-  0: number; // X-coordinate
-  1: number; // Y-coordinate
-}
 
-interface Entity {
-  id: string;
-  layer: string;
-  type: string;
-  coordinates: Coordinates2D[] | Coordinates2D;
-  radius?: number;
-  start_angle?: number;
-  end_angle?: number;
-  is_closed?: boolean;
-  text?: string;
-  height?: number;
-  color?: number;
-  strokeWidth?: number;
-  rotation?: number;
-  xscale?: number;
-  yscale?: number;
-  tag?: string;
-  [key: string]: any; // Extendable for other properties
-}
-
-interface Insert extends Entity {
-  name: string; // Block name
-  attribs?: Attrib[]; // Inserted attributes (ignored for now)
-}
-
-interface Block {
-  id: string;
-  block_name: string;
-  entities: Entity[];
-}
-
-interface Attrib {
-  text?: string;
-  coordinates: Coordinates2D;
-  rotation?: number;
-  tag: string;
-}
 
 interface SvgPanelProps {
   jsonData: Entity[]; // Expects the JSON data to adhere to the given schema

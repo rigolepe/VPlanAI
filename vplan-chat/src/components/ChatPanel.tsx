@@ -6,6 +6,7 @@ import styles from './ChatPanel.module.css';
 import { Agent } from '../types/agent';
 import { ChatMessage } from '../types/chat';
 import { sendMessageWithFunction } from '../services/api';
+import { Entity } from '../types/entity';
 
 interface ChatPanelProps {
   showAgentManager: boolean;
@@ -13,10 +14,11 @@ interface ChatPanelProps {
   agents: Agent[];
 
   changeData:  (data: any) => void
+  addEntities: (entities: Entity[]) => string
   jsonData: any
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents, jsonData, changeData }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentManager, agents, jsonData, changeData, addEntities }) => {
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userMessage, setUserMessage] = useState('');
@@ -77,6 +79,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
       const functionArgs = JSON.parse(functionCall.arguments);
       await removeElement(functionArgs.id); // Example function
     }
+
+    if(functionCall.name === "addEntities"){
+      const functionArgs = JSON.parse(functionCall.arguments);
+      const entities: Entity[] = functionArgs as Entity[]
+      const addResult = addEntities(entities)
+      // Send the result of the function back to the chat
+      const functionResult: ChatMessage = {
+        role: 'agent',
+        content: `The result of adding the entities is: ${addResult}.`,
+      };
+      setChatHistory(prev => [...prev, functionResult]);
+    }
+
   };
 
   const removeElement = async( id: string) => {
