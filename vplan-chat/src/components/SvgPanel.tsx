@@ -23,6 +23,7 @@ interface Entity {
   text?: string;
   height?: number;
   color?: number;
+  strokeWidth?: number;
   rotation?: number;
   xscale?: number;
   yscale?: number;
@@ -109,7 +110,7 @@ function groupByLayer(entities: Entity[]): { [layer: string]: Entity[] } {
 const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   const [layers, setLayers] = useState<{ [layer: string]: Entity[] }>({});
   const [blocks, setBlocks] = useState<{ [blockName: string]: Entity[] }>({});
-  const [inVisibleLayers, setInvisibleLayers] = useLocalStorage<string[]>('inVisibleLayers',[])
+  const [inVisibleLayers, setInvisibleLayers] = useLocalStorage<string[]>('inVisibleLayers', [])
   const [bounds, setBounds] = useState<number[]>([0, 0, 100, 100])
   const [width, setWidth] = useState<number>(100)
   const [height, setHeight] = useState<number>(100)
@@ -245,6 +246,44 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
     return (angle * Math.PI) / 180.0
   }
 
+  function aciToHexColor(aci: number): string {
+    // Define the mapping of ACI to RGB colors
+    const aciColors: { [key: number]: [number, number, number] } = {
+      1: [255, 0, 0],     // Red
+      2: [255, 255, 0],   // Yellow
+      3: [0, 255, 0],     // Green
+      4: [0, 255, 255],   // Cyan
+      5: [0, 0, 255],     // Blue
+      6: [255, 0, 255],   // Magenta
+      7: [255, 255, 255], // White (Black on dark background)
+      // ... add additional colors as needed up to 255
+      8: [128, 128, 128], // Gray
+      // Example of shades can go here, just as placeholders
+      256: [0, 0, 0],     // ByLayer (black as default, change according to layer color)
+    };
+
+    // Handle "ByLayer" case, which is ACI 256
+    if (aci === 256) {
+      // Here you would need to return the layer color or a default (black in this example)
+      return '#000000'; // Default to black or get from layer information
+    }
+
+    // Fallback for unrecognized ACI values
+    if (!aciColors[aci]) {
+      return '#000000'; // Return black as a fallback
+    }
+
+    // Convert the RGB array to a hex string
+    const [r, g, b] = aciColors[aci];
+    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()}`;
+  }
+
+  // Function to get the hex color or a default value
+  function aciToHexColorOpt(color: number | undefined, defaultColor: string): string {
+    return color !== undefined ? aciToHexColor(color) : defaultColor;
+  }
+
+
   // Drawing functions for each type of entity
   const renderEntity = (entity: Entity) => {
     switch (entity.type) {
@@ -261,7 +300,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             y1={start[1]}
             x2={end[0]}
             y2={end[1]}
-            stroke="black"
+            stroke={aciToHexColorOpt(entity.color, "black")}
             strokeWidth={defaultStrokeWidth}
           />
         )
@@ -278,7 +317,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             key={uuid()}
             points={points}
             fill="none"
-            stroke="black"
+            stroke={aciToHexColorOpt(entity.color, "black")}
             strokeWidth={defaultStrokeWidth}
           />
         )
@@ -293,7 +332,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             key={uuid()}
             points={points}
             fill="gray"
-            stroke="black"
+            stroke={aciToHexColorOpt(entity.color, "black")}
             strokeWidth={defaultStrokeWidth}
           />
         )
@@ -306,7 +345,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
             cx={x}
             cy={y}
             r={entity.radius}
-            stroke="black"
+            stroke={aciToHexColorOpt(entity.color, "black")}
             fill="none"
             strokeWidth={defaultStrokeWidth}
           />
@@ -326,7 +365,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
           <path
             key={uuid()}
             d={`M ${startX},${startY} A ${radius},${radius} 0 ${large_arc_flag},1 ${endX},${endY}`}
-            stroke="black"
+            stroke={aciToHexColorOpt(entity.color, "black")}
             fill="none"
             strokeWidth={defaultStrokeWidth}
           />
@@ -336,7 +375,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
         const [x, y] = entity.coordinates as Coordinates2D;
         const rotation = entity.rotation ?? 0
         return (
-          <text key={uuid()} x={x} y={y} fontSize={entity.height} fill="black" transform={`rotate(${rotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
+          <text key={uuid()} x={x} y={y} fontSize={entity.height} fill={aciToHexColorOpt(entity.color, "black")} transform={`rotate(${rotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
             {entity.text}
           </text>
         )
@@ -364,18 +403,18 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
           if (blockEntity.type === 'INSERT') {
             // return renderInsert(blockEntity as Insert)
             return null;
-          } else if (blockEntity.type === 'ATTDEF') {            
-              const attrib = insert.attribs?.find(attr => attr.tag === blockEntity.tag)
-              if(attrib) {
-                const attribText = attrib.text ?? blockEntity.text ?? ""
-                const [x, y] = attrib.coordinates
-                const textRotation = attrib.rotation ?? 0
-                return (
-                  <text key={uuid()} x={x} y={y} fill="black" transform={`rotate(${textRotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
-                    {attribText}
-                  </text>
-                )
-              } else return null;
+          } else if (blockEntity.type === 'ATTDEF') {
+            const attrib = insert.attribs?.find(attr => attr.tag === blockEntity.tag)
+            if (attrib) {
+              const attribText = attrib.text ?? blockEntity.text ?? ""
+              const [x, y] = attrib.coordinates
+              const textRotation = attrib.rotation ?? 0
+              return (
+                <text key={uuid()} x={x} y={y} fill="black" transform={`rotate(${textRotation}, ${x}, ${y}) scale(1, -1) translate(0, ${-2 * y})`}>
+                  {attribText}
+                </text>
+              )
+            } else return null;
           } else {
             return renderEntity(blockEntity)
           }

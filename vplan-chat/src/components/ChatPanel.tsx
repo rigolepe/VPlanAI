@@ -35,10 +35,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
       try {
         const response = await sendMessageWithFunction(currentAgent,  [...chatHistory, newMessage], '');
         const { assistantMessage, functionCall } = response;
+        var functionDescription = ""
+        if (functionCall?.description) {
+          functionDescription = `\n\n${functionCall?.description}`
+        }
+        const messageContent = assistantMessage.content + functionDescription
         
         setChatHistory(prev => [...prev, {
             role: 'system',
-            content: assistantMessage.content,
+            content: messageContent,
           } as ChatMessage
         ]);
         
