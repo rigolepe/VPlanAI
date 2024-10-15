@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import styles from './SvgPanel.module.css';
 import { useRef } from 'react';
 import { v4 as uuid } from 'uuid';
+import useLocalStorage from '../hooks/useLocalStorage';
 
 
 // Define the interface for the entities based on the JSON schema
@@ -108,7 +109,7 @@ function groupByLayer(entities: Entity[]): { [layer: string]: Entity[] } {
 const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   const [layers, setLayers] = useState<{ [layer: string]: Entity[] }>({});
   const [blocks, setBlocks] = useState<{ [blockName: string]: Entity[] }>({});
-  const [inVisibleLayers, setInvisibleLayers] = useState<string[]>([])
+  const [inVisibleLayers, setInvisibleLayers] = useLocalStorage<string[]>('inVisibleLayers',[])
   const [bounds, setBounds] = useState<number[]>([0, 0, 100, 100])
   const [width, setWidth] = useState<number>(100)
   const [height, setHeight] = useState<number>(100)
@@ -120,9 +121,8 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData }) => {
   const svgContainerRef = useRef<HTMLDivElement | null>(null);
   const translationRef = useRef<[number, number]>([0, 0]); // Use ref for translation
 
-
-
   const defaultStrokeWidth = 0.1
+
 
   // Load the JSON data and group by layers
   useEffect(() => {
