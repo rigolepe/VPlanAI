@@ -6,7 +6,9 @@ import styles from './ChatPanel.module.css';
 import { Agent } from '../types/agent';
 import { ChatMessage } from '../types/chat';
 import { sendMessageWithFunction } from '../services/api';
-import { Entity } from '../types/entity';
+import { Block, CONCRETE_TYPES, Coordinates2D, Entity, LINE_BASED, POINT_BASED } from '../types/entity';
+import Papa from 'papaparse';
+
 
 interface ChatPanelProps {
   showAgentManager: boolean;
@@ -25,19 +27,114 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
   const [userMessage, setUserMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const lowLevelDataFilter = (entities: Entity[]) => {
+  // [[1.165495400241849, -0.7517668495839811], [1.086920836656441, -1.020953436445809]]
+  const pointCoordsToString = (coords: Coordinates2D): string => {
+    return `[${coords[0]},${coords[1]}]`
+  }
+
+  const lineCoordsToString = (coords: Coordinates2D[]): string => {
+    return `[${coords.map(pointCoordsToString).join(', ')}]`;
+  }
+
+  const attributesToExclude = ["attribs", "entities", "coordinates", "linetype", "color", "attribs", "elevation", "flags", "height", "prompt", "id"];
+
+  const slaEntitiesPlat = (entities: Entity[], blockNaam = ""): Entity[] => {
+    var platgeslagenBlockEntities: Entity[] = []
+    const platgeslagenEntities =
+      entities
+        .map(entity => {
+          if (entity.coordinates) {
+            if (POINT_BASED.includes(entity.type)) {
+              entity.coordString = pointCoordsToString(entity.coordinates as Coordinates2D);
+            } else if (LINE_BASED.includes(entity.type)) {
+              entity.coordString = lineCoordsToString(entity.coordinates as Coordinates2D[]);
+            }
+          }
+          if (entity.type === 'BLOCK') {
+            const block = (entity as Block)
+            platgeslagenBlockEntities = [...platgeslagenBlockEntities, ...slaEntitiesPlat(block.entities, block.block_name)]
+            // block.entities = [] // deze moet op undefined gezet worden later, mag niet meer in de CSV komen
+          }
+          if(blockNaam) entity.block_name = blockNaam
+          return entity
+        })
+    return [...platgeslagenBlockEntities, ...platgeslagenEntities]
+  }
+
+  const verwijderBlocks = (entities: Entity[]): Entity[] => {
+    return entities.filter(entity => {
+      return entity.type !== 'BLOCK' // die moeten er niet meer in
+    })
+  }
+
+  const filterAttributenWegNaPlatslaan = (entities: Entity[]): Entity[] => {
+    return entities
+      .map(entity => {
+        attributesToExclude.forEach(attr => {
+          entity[attr] = undefined;
+          delete entity[attr]
+        })
+        return entity
+      })
+  }
+
+  const lowLevelDataFilter = (entities: Entity[]): string => {
     // Predefined list of keys to be set to undefined
-    const keysToSetUndefined = ["linetype", "color", "attribs", "elevation", "flags", "height", "prompt", "id"];
-    // Use JSON.stringify with a custom replacer function
-    const jsonString = JSON.stringify(entities, (key, value) => {
-      // If the key is in the list, return undefined
-      if (keysToSetUndefined.includes(key)) {
-        return undefined;
-      }
-      // Otherwise return the original value
-      return value;
-    });
-    return jsonString
+    // const keysToSetUndefined = ["linetype", "color", "attribs", "elevation", "flags", "height", "prompt", "id", "entities"];
+    // // Use JSON.stringify with a custom replacer function
+    // const jsonString = JSON.stringify(entities, (key, value) => {
+    //   // If the key is in the list, return undefined
+    //   if (keysToSetUndefined.includes(key)) {
+    //     return undefined;
+    //   }
+    //   // Otherwise return the original value
+    //   return value;
+    // });
+
+    // JSON -> CSV 
+    // de JSON string gaan we niet meer gebruiken, maar we moeten wel nog de ongebruikte attributen weglaten
+    // platgeslagen voorstelling:
+    // name?: string; // voor de insert (platgeslagen voorstelling, betekenis: entity hoort onder block met naam name)
+    // block_name?: string; // voor de insert (platgeslagen voorstelling, betekent dit is block met naam block_name)
+    // weg te laten attributen: 
+    // zeker: "attribs", "entities", "coordinates" --> dit zijn de complexe samenstellingen
+    // extra:  ["linetype", "color", "attribs", "elevation", "flags", "height", "prompt", "id"]
+
+    const entitiesCopy: Entity[] = JSON.parse(JSON.stringify(entities)) // brute force, om onze brondata niet te impacteren met wat we weggooien 
+    const platgeslagen = slaEntitiesPlat(entitiesCopy)
+    console.log(`Na platslaan: ${Papa.unparse(platgeslagen)}`)
+    const platgeslagenEntities = verwijderBlocks(platgeslagen)
+    const platgeslagenEnGefilterdeEntities = filterAttributenWegNaPlatslaan(platgeslagenEntities)
+
+
+    // // Recursive function to filter attributes
+    // const filterAttributes = (obj: any, exclude: string[]): any => {
+    //   // Create a new object to avoid mutating the original object
+    //   const filteredObj: any = {};
+
+    //   // Iterate through the keys of the object
+    //   for (const key in obj) {
+    //     if (obj.hasOwnProperty(key)) {
+    //       // If the key is an object, recurse into it
+    //       if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+    //         // Recursively filter the nested object
+    //         filteredObj[key] = filterAttributes(obj[key], exclude);
+    //       } else if (!exclude.includes(key)) {
+    //         // If the key is not in the exclude list, copy it to the new object
+    //         filteredObj[key] = obj[key];
+    //       }
+    //     }
+    //   }
+
+    //   return filteredObj;
+    // };
+
+    // Filter the data to exclude unwanted attributes
+    // const filteredData = filterAttributes(platgeslagenEntities, attributesToExclude);
+
+    const csv = Papa.unparse(platgeslagenEnGefilterdeEntities);
+    // return jsonString
+    return csv;
   }
 
   const handleSendMessage = async () => {
@@ -46,9 +143,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
         role: 'user',
         content: userMessage,
       };
+      const filteredData = lowLevelDataFilter(filteredJsonData);
+      console.log(`csv: ${filteredData}`)
       const dataChatMessage: ChatMessage = {
         role: 'user',
-        content: `# Our JSON DXF dataset:\n\n${lowLevelDataFilter(filteredJsonData)}`
+        content: `# Our JSON DXF dataset:\n\n${filteredData}`
       }
       setChatHistory(prev => [...prev, newMessage]);
       setUserMessage('');
@@ -58,9 +157,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
         const response = await sendMessageWithFunction(currentAgent, [dataChatMessage, ...chatHistory, newMessage], '');
         const { assistantMessage, functionCall } = response;
         var functionDescription = ""
-        if (functionCall?.description) {
-          functionDescription = `\n\n${functionCall?.description}`
-        }
+
+        functionDescription = `\n\n${functionCall?.description ?? ""}\n${functionCall?.name ?? ""}`
         const messageContent = assistantMessage.content + functionDescription
 
         setChatHistory(prev => [...prev, {
@@ -102,11 +200,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
 
     if (functionCall.name === "addEntities") {
       const functionArgs = JSON.parse(functionCall.arguments);
-      const entities: Entity[] = functionArgs as Entity[]
+      const entities: Entity[] = functionArgs.entities as Entity[]
       const addResult = addEntities(entities)
+      console.log(`Adding AI entities: ${addResult.length}`)
       // Send the result of the function back to the chat
       const functionResult: ChatMessage = {
-        role: 'agent',
+        role: 'system',
         content: `The result of adding the entities is: ${addResult}.`,
       };
       setChatHistory(prev => [...prev, functionResult]);

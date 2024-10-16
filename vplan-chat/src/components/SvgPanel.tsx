@@ -102,6 +102,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, changeFilteredJson }) => 
     setBounds(bounds)
     const width = bounds[2] - bounds[0]; // max_x - min_x
     const height = bounds[3] - bounds[1]; // max_y - min_y
+    console.log(`width: ${width}, height: ${height}`)
     setWidth(width)
     setHeight(height)
     setViewBox(`${bounds[0] + translationRef.current[0]} ${-bounds[1] + translationRef.current[1]} ${width / zoom} ${height / zoom}`);
@@ -384,7 +385,27 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, changeFilteredJson }) => 
     updateFilteredJson()
   };
 
-  const roundCoordinates = (entity: Entity): Entity => {
+  const roundCoordinates = (coords: Coordinates2D, digits: number = 3): Coordinates2D => {
+    const factor = Math.pow(10, digits); // Calculate the scaling factor based on the number of digits
+    // Round the x and y values to the specified number of decimal places
+    return [
+      Math.round(coords[0] * factor) / factor,
+      Math.round(coords[1] * factor) / factor
+    ];
+  };
+
+  const roundEntityCoordinates = (entity: Entity, digits: number): Entity => {
+    if (CONCRETE_TYPES.includes(entity.type)) {
+      if (POINT_BASED.includes(entity.type)) {
+        entity.coordinates = roundCoordinates(entity.coordinates as Coordinates2D, digits);
+      } else if (LINE_BASED.includes(entity.type)) {
+        entity.coordinates = (entity.coordinates as Coordinates2D[]).map(c => roundCoordinates(c, digits));
+      }
+    }
+    if (entity.type === 'BLOCK') {
+      const block = (entity as Block)
+      block.entities = block.entities.map(c => roundEntityCoordinates(c, 3))
+    }
     return entity
   }
 
@@ -394,8 +415,8 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, changeFilteredJson }) => 
     const topLevelFilteredEntities =
       jsonData
         .filter((e: Entity) => !inVisibleLayers.includes(e.layer))
-        // .map((e: Entity) => roundCoordinates(e)) 
-    const insertBlockNamesSet: Set<string> = new Set(topLevelFilteredEntities.filter(entity => entity.type === "INSERT").map(entity => entity.name));
+        .map(e => roundEntityCoordinates(e, 2))
+    const insertBlockNamesSet: Set<string> = new Set(topLevelFilteredEntities.filter(entity => entity.type === "INSERT").map(entity => entity.name ?? ""));
     const filteredBlockEntities =
       Object.values(blocks)
         .filter(block => insertBlockNamesSet.has(block.block_name))
@@ -403,7 +424,7 @@ const SvgPanel: React.FC<SvgPanelProps> = ({ jsonData, changeFilteredJson }) => 
           block.entities = block.entities.filter(entity => !["ATTDEF", "ATTRIB"].includes(entity.type))
           return block
         })
-        // .map((e: Entity) => roundCoordinates(e)) 
+        .map(e => roundEntityCoordinates(e, 2))
     console.log(`Using ${filteredBlockEntities.length} blocks of ${Object.keys(blocks).length}`)
 
     // Welke blocks worden effectief gebruikt? 

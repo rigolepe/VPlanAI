@@ -9,6 +9,7 @@ export interface Entity {
     layer: string;
     type: string;
     coordinates: Coordinates2D[] | Coordinates2D;
+    coordString?: string;
     radius?: number;
     start_angle?: number;
     end_angle?: number;
@@ -21,6 +22,8 @@ export interface Entity {
     xscale?: number;
     yscale?: number;
     tag?: string;
+    name?: string; // voor de insert (platgeslagen voorstelling, betekenis: entity hoort onder block met naam name)
+    block_name?: string; // voor de insert (platgeslagen voorstelling, betekent dit is block met naam block_name)
     [key: string]: any; // Extendable for other properties
 }
 

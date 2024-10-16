@@ -59,12 +59,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ showAgentManager, toggleAgentMa
 
   const addEntities = (entities: Entity[]) => {
     console.log(`adding ${entities.length} entities`)
-    if (jsonData && Array.isArray(jsonData)) {
-      const data = jsonData as Entity[]
-      setJsonData([...data, ...entities])
-    } else {
-      setJsonData(entities)
-    }
+    setJsonData([...jsonData, ...entities])
+    // if (jsonData && Array.isArray(jsonData)) {
+    //   const data = jsonData as Entity[]
+    //   setJsonData([...data, ...entities])
+    // } else {
+    //   setJsonData(entities)
+    // }
     return `${entities.length} entities added to the dataset and drawing.`
   }
 
