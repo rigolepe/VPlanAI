@@ -137,6 +137,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
     return csv;
   }
 
+  const uitlegBijDeCsvData: string = "# Our JSON DXF dataset als CSV:\n\nINSERT verwijst naar het invoegen van een BLOCK van entiteiten. Deze blocks zijn gedenormaliseerd in de CSV, wat betekent dat all entities die eenzelfde waarde hebben voor attribuut block_name bij hetzelfde block horen. BLOCKS zijn dus herbruikbare delen van de data die door een INSERT toegevoegd worden.\n\n"
+
   const handleSendMessage = async () => {
     if (currentAgent && userMessage.trim()) {
       const newMessage: ChatMessage = {
@@ -147,7 +149,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ showAgentManager, toggleAgentMana
       console.log(`csv: ${filteredData}`)
       const dataChatMessage: ChatMessage = {
         role: 'user',
-        content: `# Our JSON DXF dataset:\n\n${filteredData}`
+        content: `${uitlegBijDeCsvData}${filteredData}`
       }
       setChatHistory(prev => [...prev, newMessage]);
       setUserMessage('');
